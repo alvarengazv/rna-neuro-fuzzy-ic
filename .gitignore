@@ -1,4 +1,6 @@
 __pycache__
 /venv
-/resultados/*.png
+/results/
 /dataset
+*.png
+test_models.py

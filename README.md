@@ -49,17 +49,27 @@ rna-neuro-fuzzy-ic/
     │   └── *.png
     ├── src/
     │   ├── eda/
-    │   │   ├── eda.py   
-    │   │   └── preprocessing.py
+    │   │   ├── __init__.py
+    │   │   └── eda.py
     │   ├── models/
-    │   │   ├── neuro-fuzzy1.py
-    │   │   ├── neuro-fuzzy2.py
-    │   │   ├── rna1.py
-    │   │   └── rna2.py
+    │   │   ├── __init__.py
+    │   │   ├── neuro_fuzzy/
+    │   │   │   ├── __init__.py
+    │   │   │   ├── anfis.py
+    │   │   │   └── fnn_fcm.py
+    │   │   └── rna/
+    │   │       ├── __init__.py
+    │   │       ├── mlp.py
+    │   │       └── rbf.py
+    │   ├── preprocessing/
+    │   │   ├── __init__.py
+    │   │   └── preprocessing.py
     │   ├── utils/
+    │   │   ├── __init__.py
     │   │   ├── metrics.py
     │   │   └── plots.py
     │   ├── config.py
+    │   ├── consolidate.py
     │   ├── experiments.py
     │   └── main.py
     ├── .gitignore
