@@ -341,9 +341,17 @@ class ANFISRegressor(BaseEstimator, RegressorMixin):
 
                     grad_c += np.mean(chain * dmu_dc)
                     grad_s += np.mean(chain * dmu_ds)
-
+                
+                # Evitar gradientes explosivos (Gradient Clipping)
+                grad_c = np.clip(grad_c, -100.0, 100.0)
+                grad_s = np.clip(grad_s, -100.0, 100.0)
+                
                 self.centers_[j, k] -= self.learning_rate * grad_c
                 self.sigmas_[j, k] -= self.learning_rate * grad_s
+                
+                # Manter centers em um intervalo razoável (X está em escala padrão)
+                self.centers_[j, k] = np.clip(self.centers_[j, k], -100.0, 100.0)
+                
                 self.sigmas_[j, k] = max(self.sigmas_[j, k], 1e-6)
 
 

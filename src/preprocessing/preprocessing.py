@@ -29,7 +29,7 @@ _MISSING_DROP_ROW_THRESHOLD = 0.05   # <=5% missing -> remove linhas
 # Entre 5% e 50% -> preenche com mediana (numérico) ou moda (categórico)
 
 # Limiar para one-hot vs label encoding
-_ONEHOT_MAX_CARDINALITY = 15  # Se coluna tem ≤15 valores únicos → one-hot
+_ONEHOT_MAX_CARDINALITY = 100  # Se coluna tem ≤100 valores únicos → one-hot
 
 
 def load_and_preprocess(dataset_index, force=False):
@@ -276,27 +276,92 @@ def _preprocess_flight(df):
 
 
 def _preprocess_used_car(df):
-    """Used Car Price: remover colunas irrelevantes, limpar milage e price."""
-    for col in ["model", "ext_col", "int_col"]:
-        if col in df.columns:
-            df = df.drop(columns=[col])
+    """Used Car Price: limpeza e engenharia de atributos avançada."""
+    # 1. Dropar apenas 'model' (texto livre muito longo de alta cardinalidade)
+    if "model" in df.columns:
+        df = df.drop(columns=["model"])
+        
     unnamed_cols = [c for c in df.columns if "Unnamed" in c]
     if unnamed_cols:
         df = df.drop(columns=unnamed_cols)
 
-    # Limpar coluna 'milage' (ex: "51,000 mi.")
+    # 2. Limpar 'milage' (ex: "51,000 mi.")
     if "milage" in df.columns:
         df["milage"] = df["milage"].astype(str).str.replace("mi.", "", regex=False)
         df["milage"] = df["milage"].str.replace(",", "", regex=False)
         df["milage"] = df["milage"].str.strip()
         df["milage"] = pd.to_numeric(df["milage"], errors="coerce")
 
-    # Limpar coluna 'price' (ex: "$10,300")
+    # 3. Limpar 'price' (ex: "$10,300")
     if "price" in df.columns:
         df["price"] = df["price"].astype(str).str.replace("$", "", regex=False)
         df["price"] = df["price"].str.replace(",", "", regex=False)
         df["price"] = df["price"].str.strip()
         df["price"] = pd.to_numeric(df["price"], errors="coerce")
+
+    # 4. Tratar 'clean_title' (NaN -> "No", depois one-hot)
+    if "clean_title" in df.columns:
+        df["clean_title"] = df["clean_title"].fillna("No").astype(str).str.strip()
+
+    # 5. Tratar 'accident' (virar duas colunas explicitas)
+    if "accident" in df.columns:
+        acc_str = df["accident"].fillna("unknown").astype(str).str.lower()
+        df["accident_reported"] = acc_str.str.contains("accident|damage").astype(np.float64)
+        df["accident_none"] = acc_str.str.contains("none").astype(np.float64)
+        df = df.drop(columns=["accident"])
+
+    # 6. Simplificar e manter 'ext_col' e 'int_col' para evitar alta cardinalidade
+    def simplify_color(color_series):
+        colors_map = {
+            "black": "black", "white": "white", "blue": "blue", "red": "red",
+            "silver": "silver", "gray": "gray", "grey": "gray", "green": "green",
+            "brown": "brown", "beige": "beige", "yellow": "yellow", "gold": "gold",
+            "orange": "orange", "purple": "purple", "charcoal": "gray", "bronze": "brown",
+            "ebony": "black", "tan": "brown"
+        }
+        simplified = []
+        for val in color_series.fillna("other").astype(str).str.lower():
+            found = False
+            for k, v in colors_map.items():
+                if k in val:
+                    simplified.append(v)
+                    found = True
+                    break
+            if not found:
+                simplified.append("other")
+        return simplified
+
+    if "ext_col" in df.columns:
+        df["ext_col"] = simplify_color(df["ext_col"])
+    if "int_col" in df.columns:
+        df["int_col"] = simplify_color(df["int_col"])
+
+    # 7. Engenharia de Atributos para 'engine' e 'transmission'
+    # Extrair Horsepower (HP)
+    if "engine" in df.columns:
+        hp_extract = df["engine"].astype(str).str.extract(r"(\d+\.?\d*)\s*HP", expand=False)
+        df["engine_hp"] = pd.to_numeric(hp_extract, errors="coerce")
+        # Extrair Litros (L)
+        l_extract = df["engine"].astype(str).str.extract(r"(\d+\.?\d*)\s*(?:L|Liter)", expand=False)
+        df["engine_liters"] = pd.to_numeric(l_extract, errors="coerce")
+        
+        # Se for elétrico, cilindrada é 0
+        is_electric = df["engine"].astype(str).str.lower().str.contains("electric")
+        df.loc[is_electric, "engine_liters"] = 0.0
+        
+        # Dropar a coluna original complexa
+        df = df.drop(columns=["engine"])
+
+    if "transmission" in df.columns:
+        trans_str = df["transmission"].fillna("other").astype(str).str.lower()
+        df["trans_automatic"] = trans_str.str.contains("automatic|a/t|cvt|dual shift|at|auto|speed a/t").astype(np.float64)
+        df["trans_manual"] = trans_str.str.contains("manual|m/t|mt|speed m/t").astype(np.float64)
+        df = df.drop(columns=["transmission"])
+
+    # 8. Converter model_year para idade do carro (age) - facilita o aprendizado do modelo
+    if "model_year" in df.columns:
+        df["car_age"] = 2026 - df["model_year"]
+        df = df.drop(columns=["model_year"])
     return df
 
 

@@ -4,3 +4,4 @@ __pycache__
 /dataset
 *.png
 test_models.py
+/.venv
