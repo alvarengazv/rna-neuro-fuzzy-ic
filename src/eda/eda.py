@@ -50,6 +50,11 @@ def run_eda(dataset_index):
 
     # Target
     if target_col in df.columns:
+        # Se o target veio como string (ex: '$2,000'), converter para numérico
+        if not pd.api.types.is_numeric_dtype(df[target_col]):
+            df[target_col] = df[target_col].astype(str).str.replace(r'[\$,]', '', regex=True)
+            df[target_col] = pd.to_numeric(df[target_col], errors='coerce')
+
         print(f"\nTarget '{target_col}':")
         print(f"  min:    {df[target_col].min():.4f}")
         print(f"  max:    {df[target_col].max():.4f}")

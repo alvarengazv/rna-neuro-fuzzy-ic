@@ -312,6 +312,20 @@ def run_all_experiments(dataset_indices=None, model_indices=None,
         # 5. Salvar resultados do dataset
         if ds_results:
             df_results = pd.DataFrame(ds_results)
+            
+            csv_path = os.path.join(ds_dir, "all_results.csv")
+            
+            # Lê resultados existentes para não sobrescrever modelos anteriores
+            if os.path.exists(csv_path):
+                try:
+                    df_existing = pd.read_csv(csv_path)
+                    models_run = df_results["model"].unique()
+                    # Remove do CSV antigo os modelos que acabamos de rodar (para atualizar)
+                    df_existing = df_existing[~df_existing["model"].isin(models_run)]
+                    df_results = pd.concat([df_existing, df_results], ignore_index=True)
+                except Exception as e:
+                    print(f"  Aviso ao ler {csv_path} existente: {e}")
+
             all_results[ds_idx] = df_results
 
             # CSV com todos os resultados
