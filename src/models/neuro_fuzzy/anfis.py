@@ -87,21 +87,31 @@ class ANFISRegressor(BaseEstimator, RegressorMixin):
         self._init_mf_params(X, rng)
 
         # ---- Treinamento híbrido ----
+        _MAX_EPOCH_SAMPLES = 10000  # Subamostragem por época para datasets grandes
         for epoch in range(self.n_epochs):
+            # Subamostragem estocástica por época (varia a cada época)
+            if n_samples > _MAX_EPOCH_SAMPLES:
+                epoch_idx = rng.choice(n_samples, _MAX_EPOCH_SAMPLES, replace=False)
+                X_ep = X[epoch_idx]
+                y_ep = y[epoch_idx]
+            else:
+                X_ep = X
+                y_ep = y
+
             # Forward pass
-            mu = self._fuzzify(X)               # (n_samples, n_features, n_mfs)
-            w = self._compute_firing(mu)         # (n_samples, n_rules)
-            w_norm = self._normalize_firing(w)   # (n_samples, n_rules)
+            mu = self._fuzzify(X_ep)               # (n_batch, n_features, n_mfs)
+            w = self._compute_firing(mu)            # (n_batch, n_rules)
+            w_norm = self._normalize_firing(w)      # (n_batch, n_rules)
 
             # LSE para consequentes (forward)
-            self._fit_consequents_lse(X, y, w_norm)
+            self._fit_consequents_lse(X_ep, y_ep, w_norm)
 
             # Predição com consequentes atuais
-            y_pred = self._predict_with_params(X, w_norm)
-            error = y - y_pred
+            y_pred = self._predict_with_params(X_ep, w_norm)
+            error = y_ep - y_pred
 
             # Backward pass — atualizar premissas por gradiente
-            self._update_premises(X, y, mu, w, w_norm, error)
+            self._update_premises(X_ep, y_ep, mu, w, w_norm, error)
 
         return self
 

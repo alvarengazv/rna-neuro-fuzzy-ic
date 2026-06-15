@@ -50,6 +50,22 @@ def optimize_hyperparams(model_module, X_train, y_train, n_trials, n_folds, rand
     study : optuna.Study
     """
     model_name = model_module.get_model_name()
+    n_samples = X_train.shape[0]
+
+    # --- Otimização 1: subamostragem para datasets grandes ---
+    _MAX_OPTUNA_SAMPLES = 50000
+    if n_samples > _MAX_OPTUNA_SAMPLES:
+        rng_sub = np.random.RandomState(random_state)
+        sub_idx = rng_sub.choice(n_samples, _MAX_OPTUNA_SAMPLES, replace=False)
+        X_optuna = X_train[sub_idx]
+        y_optuna = y_train[sub_idx]
+    else:
+        X_optuna = X_train
+        y_optuna = y_train
+
+    # --- Otimização 2: reduzir folds para datasets grandes ---
+    if n_samples > 100000 and n_folds > 3:
+        n_folds = 3
 
     def objective(trial):
         params = model_module.get_optuna_search_space(trial)
@@ -57,9 +73,9 @@ def optimize_hyperparams(model_module, X_train, y_train, n_trials, n_folds, rand
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
         scores = []
 
-        for train_idx, val_idx in kf.split(X_train):
-            X_tr, X_val = X_train[train_idx], X_train[val_idx]
-            y_tr, y_val = y_train[train_idx], y_train[val_idx]
+        for train_idx, val_idx in kf.split(X_optuna):
+            X_tr, X_val = X_optuna[train_idx], X_optuna[val_idx]
+            y_tr, y_val = y_optuna[train_idx], y_optuna[val_idx]
 
             try:
                 model = model_module.create_model(params, random_state=random_state)
@@ -81,8 +97,17 @@ def optimize_hyperparams(model_module, X_train, y_train, n_trials, n_folds, rand
         sampler=optuna.samplers.TPESampler(seed=random_state),
         pruner=optuna.pruners.MedianPruner(n_startup_trials=5),
     )
+    study.set_user_attr("dataset_size", int(X_train.shape[0]))
 
-    print(f"\n  → Otimizando {model_name} ({n_trials} trials, {n_folds}-fold CV)...")
+    # Log das otimizações aplicadas
+    opt_info = []
+    if n_samples > _MAX_OPTUNA_SAMPLES:
+        opt_info.append(f"sub={_MAX_OPTUNA_SAMPLES}")
+    if n_samples > 100000:
+        opt_info.append(f"{n_folds}-fold")
+    opt_str = f" [{', '.join(opt_info)}]" if opt_info else ""
+
+    print(f"\n  → Otimizando {model_name} ({n_trials} trials, {n_folds}-fold CV){opt_str}...")
     start = time.time()
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
     elapsed = time.time() - start

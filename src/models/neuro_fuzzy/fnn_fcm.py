@@ -101,6 +101,13 @@ class FuzzyClusterNNRegressor(BaseEstimator, RegressorMixin):
         n_samples = X.shape[0]
         m = self.fuzziness
 
+        # Subamostragem para datasets grandes (centros FCM convergem bem com subsets)
+        _MAX_FCM_SAMPLES = 20000
+        if n_samples > _MAX_FCM_SAMPLES:
+            sub_idx = rng.choice(n_samples, _MAX_FCM_SAMPLES, replace=False)
+            X = X[sub_idx]
+            n_samples = _MAX_FCM_SAMPLES
+
         # Inicializar graus de pertinência aleatórios
         U = rng.rand(n_samples, k)
         U = U / U.sum(axis=1, keepdims=True)  # normalizar para soma = 1
@@ -177,26 +184,40 @@ class FuzzyClusterNNRegressor(BaseEstimator, RegressorMixin):
     # Treinamento dos consequentes
     # ================================================================
     def _train_consequents(self, X, y):
-        """Treina consequentes Takagi-Sugeno por gradiente descendente."""
+        """Treina consequentes Takagi-Sugeno por gradiente descendente com mini-batches."""
         n_samples = X.shape[0]
         X_aug = np.hstack([X, np.ones((n_samples, 1))])
 
+        _BATCH_SIZE = 4096
+        rng = np.random.RandomState(self.random_state)
+
         for epoch in range(self.n_epochs):
+            # Mini-batch estocástico por época
+            if n_samples > _BATCH_SIZE:
+                batch_idx = rng.choice(n_samples, _BATCH_SIZE, replace=False)
+                X_batch = X[batch_idx]
+                X_aug_batch = X_aug[batch_idx]
+                y_batch = y[batch_idx]
+            else:
+                X_batch = X
+                X_aug_batch = X_aug
+                y_batch = y
+
             # Forward
-            activations = self._compute_rule_activation(X)
+            activations = self._compute_rule_activation(X_batch)
             act_sum = activations.sum(axis=1, keepdims=True) + 1e-10
             act_norm = activations / act_sum
 
-            rule_outputs = X_aug @ self.consequents_.T  # (n_samples, k)
+            rule_outputs = X_aug_batch @ self.consequents_.T  # (batch, k)
             y_pred = np.sum(act_norm * rule_outputs, axis=1)
 
             # Erro
-            error = y_pred - y  # (n_samples,)
+            error = y_pred - y_batch
 
             # Gradiente dos consequentes
             # dE/dθ_i = Σ_n error_n * w̄_i_n * x_aug_n
             for i in range(self.effective_n_clusters_):
-                grad = (error * act_norm[:, i])[:, np.newaxis] * X_aug
+                grad = (error * act_norm[:, i])[:, np.newaxis] * X_aug_batch
                 grad_mean = grad.mean(axis=0)
                 self.consequents_[i] -= self.learning_rate * grad_mean
 

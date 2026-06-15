@@ -32,23 +32,34 @@ def get_optuna_search_space(trial):
     # Função de ativação
     activation = trial.suggest_categorical("activation", ["relu", "tanh", "logistic"])
 
-    # Otimizador
-    solver = trial.suggest_categorical("solver", ["adam", "sgd", "lbfgs"])
+    # Otimizador (se o dataset for grande, lbfgs fica extremamente lento/trava por tentar batch completo)
+    dataset_size = 0
+    try:
+        dataset_size = trial.study.user_attrs.get("dataset_size", 0)
+    except Exception:
+        pass
+
+    if dataset_size > 20000:
+        solver = trial.suggest_categorical("solver", ["adam", "sgd"])
+        # Para bases grandes, usar lotes maiores para paralelização eficiente no processador
+        batch_size = trial.suggest_categorical("batch_size", [256, 512, 1024, 2048])
+        # Limitar épocas para bases grandes (converge rápido com lotes maiores + early stopping)
+        max_iter = trial.suggest_int("max_iter", 100, 300, step=50)
+    else:
+        solver = trial.suggest_categorical("solver", ["adam", "sgd", "lbfgs"])
+        # Épocas normais
+        max_iter = trial.suggest_int("max_iter", 200, 1000, step=100)
+        # Batch size (apenas para adam e sgd)
+        if solver in ["adam", "sgd"]:
+            batch_size = trial.suggest_categorical("batch_size", [16, 32, 64, 128])
+        else:
+            batch_size = "auto"
 
     # Taxa de aprendizado (apenas para adam e sgd)
     if solver in ["adam", "sgd"]:
         learning_rate_init = trial.suggest_float("learning_rate_init", 1e-4, 1e-1, log=True)
     else:
         learning_rate_init = 0.001  # default, não usado por lbfgs
-
-    # Épocas
-    max_iter = trial.suggest_int("max_iter", 200, 1000, step=100)
-
-    # Batch size (apenas para adam e sgd)
-    if solver in ["adam", "sgd"]:
-        batch_size = trial.suggest_categorical("batch_size", [16, 32, 64, 128])
-    else:
-        batch_size = "auto"
 
     # Regularização L2
     use_regularization = trial.suggest_categorical("use_regularization", [True, False])
