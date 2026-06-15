@@ -11,7 +11,7 @@ def get_model_name():
     return "MLP"
 
 
-def get_optuna_search_space(trial):
+def get_optuna_search_space(trial, dataset_size=0):
     """
     Define o espaço de busca de hiperparâmetros para o MLP via Optuna.
 
@@ -33,12 +33,6 @@ def get_optuna_search_space(trial):
     activation = trial.suggest_categorical("activation", ["relu", "tanh", "logistic"])
 
     # Otimizador (se o dataset for grande, lbfgs fica extremamente lento/trava por tentar batch completo)
-    dataset_size = 0
-    try:
-        dataset_size = trial.study.user_attrs.get("dataset_size", 0)
-    except Exception:
-        pass
-
     if dataset_size > 20000:
         solver = trial.suggest_categorical("solver", ["adam", "sgd"])
         # Para bases grandes, usar lotes maiores para paralelização eficiente no processador

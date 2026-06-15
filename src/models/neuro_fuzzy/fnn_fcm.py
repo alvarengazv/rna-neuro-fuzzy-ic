@@ -238,7 +238,7 @@ def get_model_name():
     return "FNN-FCM"
 
 
-def get_optuna_search_space(trial):
+def get_optuna_search_space(trial, dataset_size=0):
     """Espaço de busca Optuna para FNN-FCM."""
     n_clusters = trial.suggest_int("n_clusters", 2, 10)
     fuzziness = trial.suggest_float("fuzziness", 1.5, 3.0)

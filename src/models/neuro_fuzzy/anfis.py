@@ -381,7 +381,7 @@ def get_model_name():
     return "ANFIS"
 
 
-def get_optuna_search_space(trial):
+def get_optuna_search_space(trial, dataset_size=0):
     """Espaço de busca Optuna para ANFIS."""
     n_mfs = trial.suggest_int("n_mfs", 2, 5)
     mf_type = trial.suggest_categorical("mf_type", ["gaussian", "bell", "triangular"])

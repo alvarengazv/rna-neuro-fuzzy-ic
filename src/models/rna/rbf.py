@@ -101,7 +101,7 @@ def get_model_name():
     return "RBF Network"
 
 
-def get_optuna_search_space(trial):
+def get_optuna_search_space(trial, dataset_size=0):
     """
     Espaço de busca Optuna para a RBF Network.
     """

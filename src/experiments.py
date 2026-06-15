@@ -79,7 +79,7 @@ def optimize_hyperparams(model_module, X_train, y_train, n_trials, n_folds, rand
         n_folds = 3
 
     def objective(trial):
-        params = model_module.get_optuna_search_space(trial)
+        params = model_module.get_optuna_search_space(trial, dataset_size=n_samples)
 
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
         scores = []
@@ -135,7 +135,7 @@ def optimize_hyperparams(model_module, X_train, y_train, n_trials, n_folds, rand
     best_params = study.best_params
     # Reconstruir params completos (para lidar com params condicionais como hidden_layer_sizes)
     best_trial = study.best_trial
-    best_params_full = model_module.get_optuna_search_space(best_trial)
+    best_params_full = model_module.get_optuna_search_space(best_trial, dataset_size=n_samples)
 
     print(f"    Melhor RMSE (CV): {study.best_value:.4f}")
     print(f"    Tempo: {elapsed:.1f}s")
