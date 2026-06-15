@@ -189,6 +189,7 @@ class FuzzyClusterNNRegressor(BaseEstimator, RegressorMixin):
         X_aug = np.hstack([X, np.ones((n_samples, 1))])
 
         _BATCH_SIZE = 4096
+        _PROGRESS_INTERVAL = max(1, self.n_epochs // 10)
         rng = np.random.RandomState(self.random_state)
 
         for epoch in range(self.n_epochs):
@@ -220,6 +221,17 @@ class FuzzyClusterNNRegressor(BaseEstimator, RegressorMixin):
                 grad = (error * act_norm[:, i])[:, np.newaxis] * X_aug_batch
                 grad_mean = grad.mean(axis=0)
                 self.consequents_[i] -= self.learning_rate * grad_mean
+
+            # Progresso de épocas
+            if self.n_epochs >= 20 and ((epoch + 1) % _PROGRESS_INTERVAL == 0 or epoch == 0):
+                rmse = np.sqrt(np.mean(error ** 2))
+                pct = (epoch + 1) / self.n_epochs * 100
+                filled = int(20 * (epoch + 1) / self.n_epochs)
+                bar = "#" * filled + "-" * (20 - filled)
+                print(f"\r        Epochs [{bar}] {epoch+1}/{self.n_epochs} ({pct:.0f}%) | RMSE: {rmse:.4f}", end="", flush=True)
+
+        if self.n_epochs >= 20:
+            print()  # nova linha ao finalizar épocas
 
 
 def get_model_name():

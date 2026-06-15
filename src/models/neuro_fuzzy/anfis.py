@@ -88,6 +88,7 @@ class ANFISRegressor(BaseEstimator, RegressorMixin):
 
         # ---- Treinamento híbrido ----
         _MAX_EPOCH_SAMPLES = 10000  # Subamostragem por época para datasets grandes
+        _PROGRESS_INTERVAL = max(1, self.n_epochs // 10)  # Mostrar progresso a cada ~10%
         for epoch in range(self.n_epochs):
             # Subamostragem estocástica por época (varia a cada época)
             if n_samples > _MAX_EPOCH_SAMPLES:
@@ -112,6 +113,17 @@ class ANFISRegressor(BaseEstimator, RegressorMixin):
 
             # Backward pass — atualizar premissas por gradiente
             self._update_premises(X_ep, y_ep, mu, w, w_norm, error)
+
+            # Progresso de épocas
+            if self.n_epochs >= 20 and ((epoch + 1) % _PROGRESS_INTERVAL == 0 or epoch == 0):
+                rmse = np.sqrt(np.mean(error ** 2))
+                pct = (epoch + 1) / self.n_epochs * 100
+                filled = int(20 * (epoch + 1) / self.n_epochs)
+                bar = "#" * filled + "-" * (20 - filled)
+                print(f"\r        Epochs [{bar}] {epoch+1}/{self.n_epochs} ({pct:.0f}%) | RMSE: {rmse:.4f}", end="", flush=True)
+
+        if self.n_epochs >= 20:
+            print()  # nova linha ao finalizar épocas
 
         return self
 

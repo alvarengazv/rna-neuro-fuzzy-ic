@@ -31,6 +31,17 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 MODEL_MODULES = [mlp, rbf, anfis, fnn_fcm]
 
 
+def _print_progress(current, total, prefix="", suffix="", bar_length=30):
+    """Imprime barra de progresso in-place no terminal."""
+    pct = current / total if total > 0 else 1
+    filled = int(bar_length * pct)
+    bar = "#" * filled + "-" * (bar_length - filled)
+    line = f"\r    {prefix} [{bar}] {current}/{total} ({pct*100:.0f}%) {suffix}"
+    print(line, end="", flush=True)
+    if current >= total:
+        print()  # nova linha ao finalizar
+
+
 def optimize_hyperparams(model_module, X_train, y_train, n_trials, n_folds, random_state=42):
     """
     Otimiza hiperparâmetros usando Optuna com validação cruzada.
@@ -108,8 +119,17 @@ def optimize_hyperparams(model_module, X_train, y_train, n_trials, n_folds, rand
     opt_str = f" [{', '.join(opt_info)}]" if opt_info else ""
 
     print(f"\n  → Otimizando {model_name} ({n_trials} trials, {n_folds}-fold CV){opt_str}...")
+
+    # Callback de progresso para Optuna
+    def _optuna_callback(study, trial):
+        n_complete = len(study.trials)
+        best = study.best_value
+        best_str = f"| Best RMSE: {best:.4f}" if best < float("inf") else ""
+        _print_progress(n_complete, n_trials, prefix="Trials", suffix=best_str)
+
     start = time.time()
-    study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=False,
+                   callbacks=[_optuna_callback])
     elapsed = time.time() - start
 
     best_params = study.best_params
@@ -236,6 +256,7 @@ def run_all_experiments(dataset_indices=None, model_indices=None,
             print(f"\n  → Executando {n_runs} runs independentes...")
             run_metrics = []
             last_y_pred = None
+            run_start = time.time()
 
             for run in range(n_runs):
                 seed = run  # Seeds 0 a 20
@@ -249,13 +270,18 @@ def run_all_experiments(dataset_indices=None, model_indices=None,
                     run_metrics.append(metrics)
                     last_y_pred = y_pred
 
-                    if (run + 1) % 7 == 0 or run == 0:
-                        print(f"    Run {run+1}/{n_runs}: "
-                              f"RMSE={metrics['RMSE']:.4f}, "
-                              f"R²={metrics['R2']:.4f}")
+                    elapsed_runs = time.time() - run_start
+                    avg_per_run = elapsed_runs / (run + 1)
+                    remaining = avg_per_run * (n_runs - run - 1)
+                    eta_str = f"| ETA: {remaining:.0f}s" if remaining > 0 else ""
+                    _print_progress(
+                        run + 1, n_runs, prefix="Runs",
+                        suffix=f"| RMSE={metrics['RMSE']:.4f} {eta_str}"
+                    )
 
                 except Exception as e:
-                    print(f"    Run {run}: ERRO — {e}")
+                    _print_progress(run + 1, n_runs, prefix="Runs", suffix=f"| ERRO")
+                    print(f"\n    Run {run}: ERRO — {e}")
 
             if not run_metrics:
                 print(f"  Nenhuma run concluída para {model_name}")
