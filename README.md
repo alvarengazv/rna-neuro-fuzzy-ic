@@ -147,13 +147,17 @@ Para instalar o projeto, siga os passos abaixo:
 
   O projeto utiliza as seguintes bibliotecas:
 
+  - kagglehub
   - pandas
-  - numpy
   - matplotlib
   - seaborn
   - scikit-learn
   - scikit-fuzzy
-  - imblearn
+  - imbalanced-learn
+  - optuna
+  - numpy
+  - scipy
+  - joblib
 
 </div>
 
